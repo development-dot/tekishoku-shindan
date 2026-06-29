@@ -188,10 +188,9 @@
     color: #000;
     font-size: 4.7cqw;           /* 看板幅基準（看板と一緒に拡縮）。羊皮紙内に必ず収まるサイズ */
     line-height: 1.4;
-    word-break: normal;          /* 日本語の禁則に従って自然に改行 */
-    overflow-wrap: anywhere;
-    line-break: strict;
-    text-wrap: balance;          /* 各行の長さを均等に */
+    word-break: auto-phrase;     /* 対応ブラウザは文節（自然な区切り）で改行 */
+    overflow-wrap: anywhere;     /* 長すぎる時だけ任意位置で折り返し */
+    line-break: strict;          /* 行頭に句読点が来ない（禁則） */
     overflow: hidden;
     z-index: 5;
   }
@@ -225,9 +224,12 @@
     width: 88%;
     text-align: center;
     color: #000;
+    /* 「次のアクション」ボタンと同じ Reggae One に（button は継承しないので明示） */
+    font-family: "Reggae One", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
     font-size: 0.95cqw;
     line-height: 1.25;
-    word-break: break-word;
+    word-break: auto-phrase;
+    overflow-wrap: anywhere;
   }
   .card:hover { transform: translateY(-4px) scale(1.03); filter: brightness(1.05); }
   .card:active { transform: translateY(-1px) scale(1.0); }
@@ -1222,6 +1224,6 @@
       document.getElementById('form-thanks').scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
   </script>
-  <div style="position:fixed;right:5px;bottom:3px;z-index:99;font:11px monospace;color:rgba(255,255,255,.6);pointer-events:none;">ver.16</div>
+  <div style="position:fixed;right:5px;bottom:3px;z-index:99;font:11px monospace;color:rgba(255,255,255,.6);pointer-events:none;">ver.17</div>
 </body>
 </html>
