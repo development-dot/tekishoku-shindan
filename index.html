@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>適職診断</title>
+<style>
+  @font-face {
+    font-family: "Reggae One";
+    src: url("assets/fonts/ReggaeOne-Regular.ttf") format("truetype");
+    font-weight: 400;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "BestTen DOT";
+    src: url("assets/fonts/BestTen-DOT.otf") format("opentype");
+    font-weight: 400;
+    font-display: swap;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #1a2330;
+    overflow: hidden;
+    font-family: "Reggae One", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+  }
+
+  /* 16:9 を保ったままビューポートを覆うステージ（cover）。
+     背景もオーバーレイも同じ比率にロックされるので、画面比が変わっても文字がはみ出さない */
+  .stage {
+    position: fixed;
+    inset: 0;
+    margin: auto;                                   /* fixed+inset0+margin auto で中央寄せ（transform不使用） */
+    width: max(100vw, calc(100dvh * 1672 / 941));
+    height: max(100dvh, calc(100vw * 941 / 1672));
+    container-type: size;
+    overflow: hidden;
+  }
+
+  .bg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    pointer-events: none;
+    user-select: none;
+  }
+
+  /* 画面の切り替え */
+  .screen { position: absolute; inset: 0; }
+  .screen[hidden] { display: none; }
+
+  /* ===== タイトル画面 ===== */
+  .title-bg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    pointer-events: none;
+    user-select: none;
+  }
+  .title-logo {
+    position: absolute;
+    left: 50%;
+    top: 33.3%;
+    transform: translate(-50%, -50%);
+    width: 66.5%;
+    height: auto;
+    pointer-events: none;
+    user-select: none;
+    filter: drop-shadow(0 0.6cqw 1.2cqw rgba(0,0,0,.45));
+  }
+  /* タイトルの選択ボード（木枠＋羊皮紙） */
+  .title-board {
+    position: absolute;
+    left: 29.31%;
+    top: 44.84%;
+    width: 41.39%;
+    height: auto;
+    pointer-events: none;
+    user-select: none;
+    filter: drop-shadow(0 0.6cqw 1.4cqw rgba(0,0,0,.45));
+  }
+  /* タイトルの選択ボタン（BestTen フォント） */
+  .menu-btn {
+    position: absolute;
+    left: 50%;
+    width: 22.25%;
+    transform: translate(-50%, -50%);
+    border: none;
+    background: none;
+    padding: .3cqw 0;
+    cursor: pointer;
+    font-family: "BestTen DOT", "Reggae One", sans-serif;
+    font-size: 2.3cqw;
+    letter-spacing: .08em;
+    color: #4a2f12;
+    text-align: center;
+    text-shadow: 0 1px 0 rgba(255,255,255,.35);
+    transition: transform .12s ease, color .12s ease, filter .12s ease;
+  }
+  .menu-btn:hover { transform: translate(-50%, -50%) scale(1.06); color: #8a4a12; filter: drop-shadow(0 2px 3px rgba(0,0,0,.3)); }
+  .menu-btn:active { transform: translate(-50%, -50%) scale(1.0); }
+  .menu-btn.start  { top: 73.27%; }
+  .menu-btn.types  { top: 80.60%; }
+
+  /* 結果画面の「もう一度」ボタン（看板テクスチャ流用） */
+  .start-btn {
+    position: absolute;
+    left: 50%;
+    top: 66%;
+    transform: translateX(-50%);
+    width: 22%;
+    aspect-ratio: 320 / 110;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    background: none;
+    transition: transform .15s ease, filter .15s ease;
+  }
+  .start-btn .pad {
+    position: absolute;
+    inset: 0;
+    background-image: url("assets/banner.png");
+    background-size: 250% 130%;
+    background-position: center;
+    border-radius: 12px;
+    box-shadow: 0 6px 18px rgba(0,0,0,.45);
+  }
+  .start-btn .start-label {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #2a1a06;
+    font-size: 2.4cqw;
+    font-weight: 700;
+    letter-spacing: .12em;
+  }
+  .start-btn:hover { transform: translateX(-50%) translateY(-4px) scale(1.03); filter: brightness(1.05); }
+  .start-btn:active { transform: translateX(-50%) translateY(-1px) scale(1.0); }
+
+  /* 中央の看板（質問文を内包。座標・サイズとも看板基準で固定） */
+  .banner-wrap {
+    position: absolute;
+    left: 33.19%;
+    top: -1.59%;
+    width: 33.61%;
+    height: 106.16%;
+    container-type: inline-size;   /* 中の文字を看板の幅基準にする＝看板と一緒に拡縮 */
+    pointer-events: none;
+  }
+  .banner-img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    user-select: none;
+  }
+
+  /* 質問テキスト（看板の上）。看板基準の座標・サイズなので、画面比が変わっても常に同じ位置 */
+  .question {
+    position: absolute;
+    left: 27%;                   /* 羊皮紙の中央寄せ（木枠にかからないよう内側に） */
+    top: 27%;
+    width: 46%;
+    height: 30%;
+    padding: 0 2%;               /* 羊皮紙の端から余白 */
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: #000;
+    font-size: 4.7cqw;           /* 看板幅基準（看板と一緒に拡縮）。羊皮紙内に必ず収まるサイズ */
+    line-height: 1.4;
+    word-break: normal;          /* 日本語の禁則に従って自然に改行 */
+    overflow-wrap: anywhere;
+    line-break: strict;
+    text-wrap: balance;          /* 各行の長さを均等に */
+    overflow: hidden;
+    z-index: 5;
+  }
+
+  /* 選択肢カード 2x2 */
+  .card {
+    position: absolute;
+    width: 8.55%;
+    aspect-ratio: 1 / 1;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    transition: transform .15s ease, filter .15s ease;
+  }
+  .card img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    pointer-events: none;
+    user-select: none;
+  }
+  .card .label {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 88%;
+    text-align: center;
+    color: #000;
+    font-size: 0.95cqw;
+    line-height: 1.25;
+    word-break: break-word;
+  }
+  .card:hover { transform: translateY(-4px) scale(1.03); filter: brightness(1.05); }
+  .card:active { transform: translateY(-1px) scale(1.0); }
+
+  .card.c1 { left: 41.45%; top: 48.88%; }
+  .card.c2 { left: 50.30%; top: 48.88%; }
+  .card.c3 { left: 41.45%; top: 64.08%; }
+  .card.c4 { left: 50.30%; top: 64.08%; }
+
+  /* 進捗（第n問 / 全m問） */
+  .progress {
+    position: absolute;
+    left: 50%;
+    top: 24%;
+    transform: translateX(-50%);
+    color: #fff;
+    font-size: 1.3cqw;
+    letter-spacing: .1em;
+    text-shadow: 0 1px 4px rgba(0,0,0,.8);
+  }
+
+  /* ===== 結果画面（縦長・スクロールする羊皮紙ページ） ===== */
+  #result-screen {
+    z-index: 10;
+    overflow-y: auto;
+    overflow-x: hidden;
+    background: url("assets/bg.png") center / cover fixed;
+  }
+  .result-inner {
+    position: relative;
+    min-height: 100%;
+  }
+  .result-page {
+    position: relative;
+    z-index: 1;
+    width: min(94vw, 600px);
+    margin: 22px auto;
+    min-height: calc(100% - 44px);
+    /* 正方形羊皮紙テクスチャを cover で敷く（引き延ばしなし／均一拡大のみ） */
+    background: #e7d6ac url("assets/parchment-tile.png") center / cover;
+    border: 3px solid #8a6a2e;
+    border-radius: 6px;
+    box-shadow: 0 0 0 2px #c9a85e inset, 0 14px 40px rgba(0,0,0,.5);
+    padding: 28px 26px 36px;
+    color: #3a2a12;
+    font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  /* 結果ヘッダー（タイプ＋キャラ） */
+  .result-page { --accent: #b06a1c; }
+  .result-hero {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    padding-bottom: 14px;
+    border-bottom: 3px solid var(--accent);
+  }
+  .result-char {
+    flex: 0 0 46%;
+    width: 46%;
+    height: auto;          /* 画像は元の比率のまま（引き延ばしなし） */
+    border-radius: 8px;
+    box-shadow: 0 0 0 3px var(--accent), 0 3px 10px rgba(0,0,0,.4);
+    display: block;
+  }
+  .result-hero-text { flex: 1; }
+  .result-lead {
+    display: inline-block;
+    font-size: 12px;
+    color: #fff;
+    background: var(--accent);
+    border-radius: 20px;
+    padding: 3px 12px;
+    letter-spacing: .04em;
+  }
+  .result-title {
+    font-family: "Reggae One", sans-serif;
+    font-size: 25px;
+    line-height: 1.2;
+    margin-top: 7px;
+    color: var(--accent);
+    text-shadow: 0 1px 0 rgba(255,255,255,.5);
+  }
+  .result-desc { font-size: 14px; margin-top: 8px; color: #4a3416; }
+
+  /* セクション見出し（セクションごとに配色） */
+  .sec-title {
+    font-family: "Reggae One", sans-serif;
+    font-size: 19px;
+    color: #5a3a14;
+    margin: 30px 0 12px;
+    padding: 4px 0 6px 12px;
+    border-left: 7px solid #c9a85e;
+    border-bottom: 2px solid rgba(120, 90, 40, .3);
+  }
+  .result-page .sec-title:nth-of-type(1) { border-left-color: #e0842f; color: #b25c14; } /* 次のアクション */
+  .result-page .sec-title:nth-of-type(2) { border-left-color: #3f9e57; color: #2c7a40; } /* 求人 */
+  .result-page .sec-title:nth-of-type(3) { border-left-color: #3f78c0; color: #2f5c95; } /* 社員 */
+  .result-page .sec-title:nth-of-type(4) { border-left-color: #1f9e8c; color: #197a6c; } /* 詳細 */
+  .result-page .sec-title:nth-of-type(5) { border-left-color: #d65a5a; color: #b23f3f; } /* 応募フォーム */
+  .result-page .sec-title:nth-of-type(6) { border-left-color: #8e5bb0; color: #6f4490; } /* 採用情報 */
+  .result-page .sec-title:nth-of-type(7) { border-left-color: #c79a2f; color: #997416; } /* プロフィール */
+
+  /* 次のアクション */
+  .actions { display: flex; flex-direction: column; gap: 10px; }
+  .action-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 14px 16px;
+    border: 2px solid #8a6a2e;
+    border-radius: 10px;
+    background: rgba(255, 252, 240, .7);
+    color: #4a2f12;
+    font-family: "Reggae One", sans-serif;
+    font-size: 16px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: transform .12s ease, background .12s ease, box-shadow .12s ease;
+  }
+  .action-btn:hover { transform: translateY(-2px); background: #fff; box-shadow: 0 4px 12px rgba(0,0,0,.2); }
+  .action-btn.primary {
+    background: linear-gradient(#e7b34d, #d9962f);
+    border-color: #a9701c;
+    color: #3a230a;
+    font-size: 18px;
+  }
+  .action-btn.primary:hover { background: linear-gradient(#f0c25e, #e3a23a); }
+  /* 2番目以降のアクションを色分け */
+  .actions .action-btn:nth-child(2) { border-color: #3f9e57; color: #2c7a40; }
+  .actions .action-btn:nth-child(3) { border-color: #3f78c0; color: #2f5c95; }
+  .actions .action-btn:nth-child(4) { border-color: #8e5bb0; color: #6f4490; }
+  .actions .action-btn:nth-child(5) { border-color: #1f9e8c; color: #197a6c; }
+
+  /* 求人カード */
+  .jobs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .job-card {
+    /* 正方形羊皮紙を転用したタイル（引き延ばしなし＝cover） */
+    background: #e7d6ac url("assets/parchment-tile.png") center / cover;
+    border: 2px solid #a9803c;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0,0,0,.25);
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+  }
+  .job-card h4 { font-size: 15px; color: #4a2f12; line-height: 1.3; }
+  .job-tags { display: flex; flex-wrap: wrap; gap: 4px; margin: 7px 0; }
+  .job-tags span {
+    font-size: 11px;
+    border-radius: 4px;
+    padding: 2px 7px;
+    color: #fff;
+  }
+  .job-tags span:nth-child(3n+1) { background: #e0842f; }
+  .job-tags span:nth-child(3n+2) { background: #3f9e57; }
+  .job-tags span:nth-child(3n)   { background: #3f78c0; }
+  .job-card p { font-size: 12.5px; color: #5a4524; flex: 1; }
+  .job-card a {
+    margin-top: 9px;
+    align-self: flex-start;
+    font-size: 12.5px;
+    color: #8a5a12;
+    font-weight: bold;
+    text-decoration: none;
+  }
+  .job-card a:hover { text-decoration: underline; }
+
+  /* 同じタイプの社員（WANTEDカード画像・透過のままそのまま表示） */
+  .emp-list { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .emp-photo {
+    width: 100%;
+    height: auto;            /* 元比率のまま（引き延ばしなし） */
+    display: block;
+    cursor: pointer;
+    transition: transform .12s ease, filter .12s ease;
+  }
+  .emp-photo:hover { transform: translateY(-3px) scale(1.02); filter: drop-shadow(0 6px 10px rgba(0,0,0,.4)); }
+
+  /* 手配書モーダル（クリックで拡大表示） */
+  .emp-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    background: rgba(0,0,0,.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .emp-modal[hidden] { display: none; }
+  .emp-modal-box {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .emp-modal-img {
+    max-width: min(86vw, 440px);
+    max-height: 74vh;
+    width: auto;
+    height: auto;
+    object-fit: contain;     /* 引き延ばしなし */
+  }
+  .emp-modal-interview {
+    margin-top: 16px;
+    padding: 13px 32px;
+    border: none;
+    border-radius: 10px;
+    background: linear-gradient(#e7b34d, #d9962f);
+    color: #3a230a;
+    font-family: "Reggae One", sans-serif;
+    font-size: 17px;
+    text-decoration: none;
+    box-shadow: 0 4px 14px rgba(0,0,0,.45);
+    transition: filter .12s ease, transform .12s ease;
+  }
+  .emp-modal-interview:hover { filter: brightness(1.07); transform: translateY(-2px); }
+  .emp-modal-close {
+    position: absolute;
+    top: -16px;
+    right: -16px;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: none;
+    background: #fff;
+    color: #333;
+    font-size: 24px;
+    line-height: 1;
+    cursor: pointer;
+    box-shadow: 0 2px 10px rgba(0,0,0,.5);
+  }
+
+  /* 応募フォーム / プロフィール */
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; }
+  .field { display: flex; flex-direction: column; }
+  .field.full { grid-column: 1 / -1; }
+  .field label { font-size: 13px; color: #4a2f12; margin-bottom: 4px; font-weight: bold; }
+  .field label .req { color: #b3411c; font-size: 11px; margin-left: 4px; }
+  .field input,
+  .field select,
+  .field textarea {
+    font-family: inherit;
+    font-size: 14px;
+    padding: 9px 10px;
+    border: 1.5px solid #a98a4e;
+    border-radius: 7px;
+    background: rgba(255, 253, 245, .92);
+    color: #2a1d0a;
+  }
+  .field textarea { resize: vertical; min-height: 90px; }
+  .field input:focus,
+  .field select:focus,
+  .field textarea:focus { outline: 2px solid #d9962f; border-color: #d9962f; }
+  .form-submit {
+    grid-column: 1 / -1;
+    margin-top: 6px;
+    padding: 14px;
+    border: none;
+    border-radius: 10px;
+    background: linear-gradient(#e7b34d, #d9962f);
+    color: #3a230a;
+    font-family: "Reggae One", sans-serif;
+    font-size: 18px;
+    cursor: pointer;
+    transition: filter .12s ease, transform .12s ease;
+  }
+  .form-submit:hover { filter: brightness(1.06); transform: translateY(-2px); }
+  .form-thanks {
+    grid-column: 1 / -1;
+    display: none;
+    text-align: center;
+    padding: 14px;
+    border-radius: 10px;
+    background: rgba(120, 180, 90, .2);
+    border: 1.5px solid #6a9a3a;
+    color: #2f5512;
+    font-size: 14px;
+  }
+
+  /* 採用情報・プロフィールの簡易行 */
+  .info-list { list-style: none; }
+  .info-list li {
+    display: flex;
+    gap: 10px;
+    padding: 9px 0;
+    border-bottom: 1px dashed rgba(120, 90, 40, .35);
+    font-size: 13.5px;
+  }
+  .info-list li .k { flex: 0 0 34%; color: #6a4f22; font-weight: bold; }
+  .info-list li .v { flex: 1; color: #3a2a12; }
+
+  .result-foot { margin-top: 26px; display: flex; justify-content: center; }
+  .retry-link {
+    padding: 11px 26px;
+    border: 2px solid #8a6a2e;
+    border-radius: 10px;
+    background: rgba(255, 252, 240, .7);
+    color: #4a2f12;
+    font-family: "Reggae One", sans-serif;
+    font-size: 15px;
+    cursor: pointer;
+    transition: background .12s ease, transform .12s ease;
+  }
+  .retry-link:hover { background: rgba(255,255,255,.92); transform: translateY(-2px); }
+
+  /* ===== 16タイプ一覧画面（画面幅に応じて可変・崩れない） ===== */
+  #types-screen {
+    z-index: 10;
+    overflow-y: auto;
+    overflow-x: hidden;
+    background: url("assets/bg.png") center / cover fixed;
+  }
+  .types-panel {
+    width: min(1100px, 92vw);
+    margin: clamp(16px, 4vh, 48px) auto;
+    background: rgba(18, 26, 38, .88);
+    border: 2px solid rgba(255, 220, 150, .55);
+    border-radius: 14px;
+    box-shadow: 0 10px 40px rgba(0,0,0,.5);
+    padding: clamp(16px, 3vw, 32px);
+  }
+  .types-heading {
+    text-align: center;
+    color: #ffe6a8;
+    font-size: clamp(20px, 4vw, 30px);
+    letter-spacing: .08em;
+    margin-bottom: 18px;
+    text-shadow: 0 2px 6px rgba(0,0,0,.6);
+  }
+  .types-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 14px;
+  }
+  .type-card {
+    background: rgba(255,255,255,.06);
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 8px;
+    padding: 10px 12px 12px;
+  }
+  .type-card img {
+    width: 100%;
+    height: auto;            /* 元比率のまま（引き延ばしなし） */
+    border-radius: 6px;
+    display: block;
+    margin-bottom: 8px;
+  }
+  .type-card h3 {
+    color: #ffd87a;
+    font-size: clamp(12px, 1.4vw, 15px);
+    line-height: 1.3;
+  }
+  .type-card p {
+    color: #dde6f0;
+    font-size: clamp(11px, 1.2vw, 13px);
+    line-height: 1.5;
+    margin-top: 5px;
+  }
+  .types-back {
+    display: block;
+    margin: 22px auto 0;
+    padding: 11px 32px;
+    border: 2px solid rgba(255,220,150,.6);
+    border-radius: 8px;
+    background: rgba(255,255,255,.08);
+    color: #ffe6a8;
+    font-family: "BestTen DOT", "Reggae One", sans-serif;
+    font-size: clamp(15px, 2.4vw, 18px);
+    letter-spacing: .1em;
+    cursor: pointer;
+    transition: background .12s ease, transform .12s ease;
+  }
+  .types-back:hover { background: rgba(255,255,255,.18); transform: scale(1.04); }
+
+  /* 狭い画面（スマホ等）での結果ページ調整 */
+  @media (max-width: 480px) {
+    .result-page { padding: 22px 18px 30px; }
+    .result-hero { flex-direction: column; text-align: center; }
+    .result-char { width: 62%; flex: 0 0 auto; align-self: center; }
+    .result-lead { align-self: center; }
+    .jobs-grid, .form-grid { grid-template-columns: 1fr; }
+  }
+
+  /* ===== 縦画面（スマホ）専用レイアウト：要素を縦に並べ直して読めるサイズに ===== */
+  @media (orientation: portrait) {
+    /* ステージは縦画面いっぱいに（16:9固定をやめる） */
+    .stage {
+      width: 100vw;
+      height: 100dvh;
+    }
+
+    /* タイトル画面 */
+    .title-logo { top: 14%; width: 90%; }
+    .title-board { left: 6%; top: 38%; width: 88%; }
+    .menu-btn { width: 64%; font-size: clamp(15px, 5vw, 24px); }
+    .menu-btn.start { top: 59.5%; }
+    .menu-btn.types { top: 65.5%; }
+
+    /* 質問画面：縦フローで「進捗 → 看板 → カード2×2」を自動で中央配置（数値の当て勘なし）
+       :not([hidden]) で「表示中のときだけ」flex に（id優先度で hidden を上書きしないように） */
+    #quiz-screen:not([hidden]) {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: safe center;   /* 収まらない時は上詰めにフォールバック */
+      gap: 1svh;
+      padding: 1.5svh 3vw;
+      height: 100svh;                 /* 常に見える高さに収める（URLバーが出ても見切れない） */
+      bottom: auto;
+      overflow-y: auto;
+    }
+    #quiz-screen .progress {
+      position: static;
+      transform: none;
+      font-size: clamp(13px, 3.6vw, 17px);
+    }
+    #quiz-screen .banner-wrap {
+      position: relative;
+      left: auto;
+      top: auto;
+      /* 画面を大きく埋める。幅基準と「常に見える高さ(svh)」基準の小さい方で収める */
+      width: min(62vw, 30svh);
+      aspect-ratio: 562 / 999;        /* 比率を保って高さを算出（潰れ防止） */
+      height: auto;
+      flex: 0 0 auto;
+    }
+    #quiz-screen .cards {
+      display: grid;
+      grid-template-columns: repeat(2, min(45vw, 19svh));
+      gap: 3vw;
+      justify-content: center;
+    }
+    #quiz-screen .card {
+      position: relative;   /* 中の画像・ラベル(absolute)の基準になるよう relative を維持 */
+      left: auto;
+      top: auto;
+      width: min(45vw, 19svh);
+    }
+    #quiz-screen .card .label { font-size: clamp(12px, 3.6vw, 16px); }
+  }
+</style>
+</head>
+<body>
+  <main class="stage">
+    <img class="bg" src="assets/bg.png" alt="">
+
+    <!-- タイトル画面 -->
+    <section class="screen" id="title-screen">
+      <img class="title-bg" src="assets/title-bg.png" alt="">
+      <img class="title-logo" src="assets/title-logo.png" alt="RPG適職診断">
+      <img class="title-board" src="assets/title-board.png" alt="">
+      <button class="menu-btn start" type="button" id="start-btn">診断を始める</button>
+      <button class="menu-btn types" type="button" id="types-btn">16タイプを見る</button>
+    </section>
+
+    <!-- 質問画面 -->
+    <section class="screen" id="quiz-screen" hidden>
+      <p class="progress" id="progress"></p>
+
+      <!-- 看板＋質問文（質問は看板の子要素なので常に同じ位置に乗る） -->
+      <div class="banner-wrap">
+        <img class="banner-img" src="assets/banner.png" alt="">
+        <p class="question" id="question"></p>
+      </div>
+
+      <div class="cards">
+        <button class="card c1" type="button" data-index="0">
+          <img src="assets/card1.png" alt="">
+          <span class="label"></span>
+        </button>
+        <button class="card c2" type="button" data-index="1">
+          <img src="assets/card2.png" alt="">
+          <span class="label"></span>
+        </button>
+        <button class="card c3" type="button" data-index="2">
+          <img src="assets/card3.png" alt="">
+          <span class="label"></span>
+        </button>
+        <button class="card c4" type="button" data-index="3">
+          <img src="assets/card4.png" alt="">
+          <span class="label"></span>
+        </button>
+      </div>
+    </section>
+  </main>
+
+    <!-- 結果画面 -->
+    <section class="screen" id="result-screen" hidden>
+      <div class="result-inner">
+      <div class="result-page">
+
+        <!-- 診断結果ヘッダー -->
+        <div class="result-hero">
+          <img class="result-char" id="result-char-img" src="" alt="">
+          <div class="result-hero-text">
+            <p class="result-lead">あなたの適職タイプは…</p>
+            <p class="result-title" id="result-title"></p>
+            <p class="result-desc" id="result-desc"></p>
+          </div>
+        </div>
+
+        <!-- 次のアクション -->
+        <h3 class="sec-title">次のアクション</h3>
+        <div class="actions">
+          <button class="action-btn primary" type="button" data-scroll="apply">今すぐ応募する</button>
+          <button class="action-btn" type="button" data-scroll="jobs">あなたに合う求人を見る</button>
+          <button class="action-btn" type="button" data-scroll="employees">同じタイプの社員を見る</button>
+          <a class="action-btn" href="#" target="_blank" rel="noopener">採用サイトへ</a>
+          <button class="action-btn" type="button" data-scroll="detail">診断の詳細を見る</button>
+        </div>
+
+        <!-- あなたに合う求人 -->
+        <h3 class="sec-title" id="jobs">あなたに合う求人</h3>
+        <div class="jobs-grid" id="jobs-grid"></div>
+
+        <!-- 同じタイプの社員 -->
+        <h3 class="sec-title" id="employees">同じタイプの社員</h3>
+        <div class="emp-list" id="emp-list"></div>
+
+        <!-- 診断の詳細 -->
+        <h3 class="sec-title" id="detail">診断の詳細</h3>
+        <p id="detail-desc" style="font-size:14px; white-space:pre-line;"></p>
+
+        <!-- 応募フォーム -->
+        <h3 class="sec-title" id="apply">応募フォーム</h3>
+        <form class="form-grid" id="apply-form" novalidate>
+          <div class="field">
+            <label>お名前<span class="req">必須</span></label>
+            <input type="text" name="name" autocomplete="name" required placeholder="例）山田 太郎">
+          </div>
+          <div class="field">
+            <label>フリガナ<span class="req">必須</span></label>
+            <input type="text" name="kana" required placeholder="例）ヤマダ タロウ">
+          </div>
+          <div class="field">
+            <label>メールアドレス<span class="req">必須</span></label>
+            <input type="email" name="email" autocomplete="email" required placeholder="例）taro@example.com">
+          </div>
+          <div class="field">
+            <label>電話番号<span class="req">必須</span></label>
+            <input type="tel" name="tel" autocomplete="tel" required placeholder="例）090-1234-5678">
+          </div>
+          <div class="field">
+            <label>希望ポジション</label>
+            <select name="position"></select>
+          </div>
+          <div class="field">
+            <label>入社希望時期</label>
+            <select name="timing"></select>
+          </div>
+          <div class="field full">
+            <label>志望動機</label>
+            <textarea name="motivation" placeholder="あなたの想いを自由にご記入ください"></textarea>
+          </div>
+          <button class="form-submit" type="submit">この内容で応募する</button>
+          <p class="form-thanks" id="form-thanks">応募ありがとうございます！担当者より追ってご連絡いたします。</p>
+        </form>
+
+        <!-- 採用情報 -->
+        <h3 class="sec-title">採用情報</h3>
+        <ul class="info-list">
+          <li><span class="k">募集職種</span><span class="v">エンジニア／営業／企画・マーケティング ほか</span></li>
+          <li><span class="k">雇用形態</span><span class="v">正社員（中途・新卒）</span></li>
+          <li><span class="k">勤務地</span><span class="v">本社（リモート併用可）</span></li>
+          <li><span class="k">給与</span><span class="v">経験・能力を考慮の上、当社規定により決定</span></li>
+          <li><span class="k">選考フロー</span><span class="v">書類選考 → 面接（複数回）→ 内定</span></li>
+        </ul>
+
+        <!-- あなたのプロフィール -->
+        <h3 class="sec-title">あなたのプロフィール</h3>
+        <ul class="info-list">
+          <li><span class="k">適職タイプ</span><span class="v" id="prof-type">—</span></li>
+          <li><span class="k">強み</span><span class="v" id="prof-strength">—</span></li>
+          <li><span class="k">おすすめ職種</span><span class="v" id="prof-jobs">—</span></li>
+          <li><span class="k">診断日</span><span class="v" id="prof-date">—</span></li>
+        </ul>
+
+        <div class="result-foot">
+          <button class="retry-link" type="button" id="retry-btn">もう一度診断する</button>
+        </div>
+      </div>
+      </div>
+
+      <!-- 社員の手配書モーダル -->
+      <div class="emp-modal" id="emp-modal" hidden>
+        <div class="emp-modal-box">
+          <button class="emp-modal-close" id="emp-modal-close" type="button" aria-label="閉じる">×</button>
+          <img class="emp-modal-img" id="emp-modal-img" src="" alt="">
+          <a class="emp-modal-interview" id="emp-modal-interview" href="#" target="_blank" rel="noopener">インタビューを見る</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- 16タイプ一覧画面 -->
+    <section class="screen" id="types-screen" hidden>
+      <div class="types-panel">
+        <h2 class="types-heading">16タイプ一覧</h2>
+        <div class="types-grid" id="types-grid"></div>
+        <button class="types-back" type="button" id="types-back">戻る</button>
+      </div>
+    </section>
+
+  <script>
+    /* =========================================================
+       ★ ここに質問を入れていく ★
+       q     … 質問文
+       options … 選択肢4つ（カードに表示される文言）
+       types   … 各選択肢に対応する集計タイプ（TYPE_MAP のキーと合わせる）
+                 （回答ごとに加算→最多タイプ→TYPE_MAPで16タイプに変換して結果表示）
+       ========================================================= */
+    const QUESTIONS = [
+      {
+        q: "新しいプロジェクトが始まるとき、あなたの役割は？",
+        options: [
+          "アイデアを次々に出す",
+          "チームをまとめて方向を決める",
+          "必要なデータや情報を調べる",
+          "みんなが動きやすいようサポートする",
+        ],
+        types: [
+          ["クリエイター", "イノベーター", "エクスプローラー"],
+          ["リーダー", "ストラテジスト"],
+          ["アナリスト", "ディテクティブ"],
+          ["サポーター", "サプライヤー"],
+        ],
+      },
+      {
+        q: "休日の過ごし方として理想に近いのは？",
+        options: [
+          "美術館や自然でインスピレーションを得る",
+          "知らない場所へ冒険に出かける",
+          "本を読んで知識を深める",
+          "友人と集まって楽しく過ごす",
+        ],
+        types: [
+          ["アーティスト"],
+          ["エクスプローラー"],
+          ["アナリスト"],
+          ["表現者", "コネクター"],
+        ],
+      },
+      {
+        q: "困っている人を見たとき、まず思うことは？",
+        options: [
+          "放っておけない、力になりたい",
+          "何が原因か分析したい",
+          "言葉で励まして勇気づけたい",
+          "仕組みから解決策を考えたい",
+        ],
+        types: [
+          ["サポーター", "アドボケイト"],
+          ["アナリスト", "ディテクティブ"],
+          ["メッセンジャー", "表現者"],
+          ["イノベーター", "オーガナイザー"],
+        ],
+      },
+      {
+        q: "チームで意見が割れたとき、あなたは？",
+        options: [
+          "決断を下して前に進める",
+          "双方の橋渡しをして調整する",
+          "信念に基づいて主張する",
+          "データや事実で判断する",
+        ],
+        types: [
+          ["リーダー", "ストラテジスト"],
+          ["コネクター", "サプライヤー"],
+          ["アドボケイト"],
+          ["アナリスト", "ストラテジスト"],
+        ],
+      },
+      {
+        q: "仕事で一番ワクワクする瞬間は？",
+        options: [
+          "ゼロから何かを生み出すとき",
+          "人を笑顔にできたとき",
+          "謎や課題を解き明かしたとき",
+          "計画通りに物事が進んだとき",
+        ],
+        types: [
+          ["クリエイター", "イノベーター"],
+          ["表現者", "サポーター"],
+          ["ディテクティブ", "アナリスト"],
+          ["オーガナイザー", "ストラテジスト"],
+        ],
+      },
+      {
+        q: "周りからよく言われる長所は？",
+        options: [
+          "発想がユニークで面白い",
+          "真面目でコツコツ続けられる",
+          "人当たりがよく話しやすい",
+          "視野が広く先のことを考えている",
+        ],
+        types: [
+          ["クリエイター", "イノベーター"],
+          ["サプライヤー", "オーガナイザー"],
+          ["コネクター", "サポーター"],
+          ["ヒューマニティ", "ストラテジスト"],
+        ],
+      },
+      {
+        q: "物事を伝えるとき、得意なのは？",
+        options: [
+          "ストーリーで心を動かす",
+          "論理的に筋道立てて説明する",
+          "場を盛り上げて楽しませる",
+          "相手に寄り添い共感しながら",
+        ],
+        types: [
+          ["メッセンジャー", "表現者"],
+          ["アナリスト", "ストラテジスト"],
+          ["表現者", "エクスプローラー"],
+          ["サポーター", "メッセンジャー"],
+        ],
+      },
+      {
+        q: "理想の未来として惹かれるのは？",
+        options: [
+          "地球や人にやさしい持続可能な社会",
+          "技術や仕組みが進化した便利な世界",
+          "美しいものや文化があふれる世界",
+          "みんながつながり助け合える世界",
+        ],
+        types: [
+          ["ヒューマニティ", "アドボケイト"],
+          ["イノベーター", "ストラテジスト"],
+          ["アーティスト", "クリエイター"],
+          ["コネクター", "サポーター"],
+        ],
+      },
+      {
+        q: "苦手・避けたいと感じるのは？",
+        options: [
+          "同じことの繰り返しで変化がない",
+          "ルールや段取りがなく混乱している",
+          "一人きりで誰とも関わらない作業",
+          "感情やセンスより数字だけで動くこと",
+        ],
+        types: [
+          ["エクスプローラー", "イノベーター"],
+          ["オーガナイザー", "サプライヤー"],
+          ["コネクター", "表現者"],
+          ["アーティスト", "サポーター"],
+        ],
+      },
+      {
+        q: "最後に。あなたが大切にしたい価値観は？",
+        options: [
+          "自由と挑戦",
+          "信頼と誠実",
+          "効率と成果",
+          "共感とつながり",
+        ],
+        types: [
+          ["エクスプローラー", "クリエイター"],
+          ["サプライヤー", "アドボケイト"],
+          ["ストラテジスト", "リーダー"],
+          ["サポーター", "コネクター", "ヒューマニティ"],
+        ],
+      },
+    ];
+
+    /* 16タイプ（公式データ）。id=1〜16、画像は assets/types/type{id}.png */
+    const TYPES16 = {
+      1:  { name: "ウィザード（魔術師）",      en: "Wizard",     strength: "企画・新規事業・クリエイティブ", desc: "独創的な発想で、まだ形になっていない可能性を見つけるタイプ。常識にとらわれず、新しいアイデアやサービスを生み出す力があります。" },
+      2:  { name: "ナイト（騎士）",            en: "Knight",     strength: "マネジメント・営業リーダー・プロジェクト推進", desc: "仲間を率いて前に進む勇敢なリーダー。責任感が強く、困難な場面でもチームを鼓舞しながら成果に向かえます。" },
+      3:  { name: "セージ（賢者）",            en: "Sage",       strength: "分析・戦略・コンサル・リサーチ", desc: "知識と分析で本質を見抜く思考派タイプ。感覚だけで動かず、情報を整理し、正しい判断に導く力があります。" },
+      4:  { name: "クレリック（僧侶）",        en: "Cleric",     strength: "人事・カスタマーサポート・教育・組織づくり", desc: "仲間を癒し支える慈愛の存在。人の悩みや変化に気づき、チームが安心して働ける環境をつくるのが得意です。" },
+      5:  { name: "アルケミスト（錬金術師）",  en: "Alchemist",  strength: "開発・技術職・DX推進・業務改善", desc: "新しい技術や仕組みを生み出す発明家タイプ。既存のものを組み合わせて、より便利で価値ある形に変える力があります。" },
+      6:  { name: "バード（吟遊詩人）",        en: "Bard",       strength: "広報・マーケティング・営業・採用広報", desc: "歌と話術で場を盛り上げる表現者。人の心を動かす言葉や空気づくりが得意で、サービスや会社の魅力を伝える力があります。" },
+      7:  { name: "アルチザン（職人）",        en: "Artisan",    strength: "事務・制作・品質管理・バックオフィス", desc: "縁の下でコツコツ支える堅実派。派手さよりも正確さを大切にし、地道な積み重ねで信頼をつくるタイプです。" },
+      8:  { name: "デーモンロード／魔王",      en: "Demon Lord", strength: "経営者・事業責任者・トップ営業", desc: "圧倒的なカリスマで世界を統べる野心家。大きな目標を掲げ、人を巻き込みながら勝ち筋をつくる支配力があります。" },
+      9:  { name: "レンジャー（追跡者）",      en: "Ranger",     strength: "情報収集・市場調査・営業企画・編集", desc: "真実を追い、情報を読み解く探索者。細かな変化やヒントを見逃さず、必要な情報を集めて次の一手につなげます。" },
+      10: { name: "ガーディアン（守護者）",    en: "Guardian",   strength: "総務・法務・経理・管理部門", desc: "ルールと秩序を守る堅実家。組織が安全に動くための土台を整え、ミスやリスクを未然に防ぐ力があります。" },
+      11: { name: "アサシン（暗殺者）",        en: "Assassin",   strength: "専門職・交渉・改善担当・個人プレイヤー", desc: "静かに動き、確実に成果を出す一匹狼。目立つよりも結果を重視し、狙った課題を的確に解決するタイプです。" },
+      12: { name: "パラディン（聖騎士）",      en: "Paladin",    strength: "事業推進・社会貢献・組織リーダー", desc: "信念を貫き、正義を守る理想家タイプ。利益だけでなく、意味や誠実さを大切にしながら周囲を導きます。" },
+      13: { name: "タクティシャン（軍師）",    en: "Tactician",  strength: "経営企画・営業企画・マーケ戦略・データ分析", desc: "数字と戦略で勝利を導く頭脳派。状況を冷静に読み、限られたリソースで最大の成果を出す作戦づくりが得意です。" },
+      14: { name: "アドベンチャラー（冒険者）",en: "Adventurer", strength: "営業・新規開拓・ベンチャー・フィールドワーク", desc: "未知に挑むフットワーク軽めの行動派。変化を楽しみながら、新しい場所・人・仕事にどんどん飛び込めます。" },
+      15: { name: "ネクロマンサー（死霊術師）",en: "Necromancer",strength: "変革推進・再生事業・尖った専門職・企画", desc: "常識を超えた力で異端を貫くタイプ。普通では見過ごされるものに価値を見出し、停滞したものを再び動かす力があります。" },
+      16: { name: "ドルイド（自然術師）",      en: "Druid",      strength: "サステナビリティ・人材育成・地域事業・長期企画", desc: "自然と調和し、未来を願う調整役。短期的な成果だけでなく、長く続く仕組みや人との関係を大切にするタイプです。" },
+    };
+
+    /* スコア集計タイプ → 16タイプ への対応（必要に応じて編集可）
+       ※ 現状アサシン(11)・ネクロマンサー(15)は診断結果には出ません（一覧にのみ掲載） */
+    const TYPE_MAP = {
+      クリエイター: 1, イノベーター: 5, エクスプローラー: 14, リーダー: 2,
+      ストラテジスト: 13, アナリスト: 3, ディテクティブ: 9, サポーター: 4,
+      サプライヤー: 7, アーティスト: 6, 表現者: 6, コネクター: 8,
+      アドボケイト: 12, メッセンジャー: 9, オーガナイザー: 10, ヒューマニティ: 16,
+    };
+
+    /* 16タイプのテーマカラー（結果ページのアクセントに使用） */
+    const TYPE_COLORS = {
+      1: "#5b6fd6", 2: "#d64b4b", 3: "#1f9e8c", 4: "#d9a32f",
+      5: "#3fae66", 6: "#e0609a", 7: "#b9763a", 8: "#8e44ad",
+      9: "#3f8f4a", 10: "#4a76b0", 11: "#5a6072", 12: "#3f9bd6",
+      13: "#4656c0", 14: "#e0842f", 15: "#9b4fc0", 16: "#5a9e3f",
+    };
+
+    /* ★ あなたに合う求人（4件・差し替え可） */
+    const JOBS = [
+      { title: "Webエンジニア", tags: ["エンジニア", "リモート可"], desc: "自社プロダクトの開発を担当。新しい技術への挑戦を歓迎します。" },
+      { title: "法人営業", tags: ["営業", "未経験歓迎"], desc: "顧客の課題に寄り添い、最適な提案を行うやりがいのある仕事です。" },
+      { title: "企画・マーケティング", tags: ["企画", "裁量大"], desc: "データと発想力で事業の成長を牽引するポジションです。" },
+      { title: "UI/UXデザイナー", tags: ["デザイン", "フレックス"], desc: "ユーザー体験を design し、プロダクトの魅力を形にします。" },
+    ];
+
+    /* ★ 同じタイプの社員（WANTEDカード画像／差し替え可。interview にインタビューURL） */
+    const EMPLOYEES = [
+      { img: "assets/emp-sato.png",   alt: "佐藤みなみ", interview: "#" },
+      { img: "assets/emp-tanaka.png", alt: "田中健太",   interview: "#" },
+    ];
+
+    /* ★ フォームの選択肢 */
+    const POSITIONS = ["エンジニア", "営業", "企画・マーケティング", "デザイナー", "コーポレート", "その他"];
+    const TIMINGS   = ["できるだけ早く", "1〜3ヶ月以内", "3〜6ヶ月以内", "半年以降", "未定"];
+
+    /* ===== ここから下はロジック（基本さわらなくてOK） ===== */
+    const screens = {
+      title:  document.getElementById('title-screen'),
+      quiz:   document.getElementById('quiz-screen'),
+      result: document.getElementById('result-screen'),
+      types:  document.getElementById('types-screen'),
+    };
+    const show = (name) => {
+      Object.entries(screens).forEach(([k, el]) => { el.hidden = (k !== name); });
+    };
+
+    const progressEl = document.getElementById('progress');
+    const questionEl  = document.getElementById('question');
+    const cards = Array.from(document.querySelectorAll('#quiz-screen .card'));
+
+    let index = 0;
+    let scores = {};
+
+    // 看板の実寸から質問文サイズを計算（cqw非対応ブラウザでもはみ出さない）
+    function fitQuestionFont() {
+      const wrap = document.querySelector('.banner-wrap');
+      if (!wrap || !questionEl) return;
+      const w = wrap.clientWidth;
+      if (w > 0) questionEl.style.fontSize = (w * 0.047) + 'px';
+    }
+    window.addEventListener('resize', fitQuestionFont);
+    window.addEventListener('orientationchange', () => setTimeout(fitQuestionFont, 100));
+
+    function render() {
+      const item = QUESTIONS[index];
+      progressEl.textContent = `第${index + 1}問 / 全${QUESTIONS.length}問`;
+      questionEl.textContent = item.q;
+      fitQuestionFont();
+      cards.forEach((card, i) => {
+        const label = card.querySelector('.label');
+        const has = i < item.options.length;
+        card.style.visibility = has ? 'visible' : 'hidden';
+        label.textContent = has ? item.options[i] : '';
+      });
+    }
+
+    function answer(i) {
+      const ts = QUESTIONS[index].types?.[i] || [];
+      (Array.isArray(ts) ? ts : [ts]).forEach((t) => {
+        scores[t] = (scores[t] || 0) + 1;
+      });
+      index++;
+      if (index < QUESTIONS.length) {
+        render();
+      } else {
+        showResult();
+      }
+    }
+
+    function showResult() {
+      let best = null, max = -1;
+      for (const t of Object.keys(scores)) {
+        if (scores[t] > max) { max = scores[t]; best = t; }
+      }
+      const id = TYPE_MAP[best] || 1;
+      const t = TYPES16[id];
+
+      // タイプ別アクセントカラー
+      document.querySelector('.result-page').style.setProperty('--accent', TYPE_COLORS[id] || "#b06a1c");
+
+      const charImg = document.getElementById('result-char-img');
+      charImg.src = `assets/types/type${id}.png`;
+      charImg.alt = t.name;
+
+      document.getElementById('result-title').textContent = t.name;
+      document.getElementById('result-desc').textContent  = t.desc;
+      document.getElementById('detail-desc').textContent  =
+        `${t.desc}\n\n強みを発揮しやすい分野：${t.strength}`;
+
+      // プロフィール欄
+      document.getElementById('prof-type').textContent     = `${t.name}（${t.en}）`;
+      document.getElementById('prof-jobs').textContent     = t.strength;
+      document.getElementById('prof-strength').textContent = t.desc;
+      document.getElementById('prof-date').textContent     = new Date().toLocaleDateString('ja-JP');
+
+      document.getElementById('result-screen').scrollTop = 0;
+      show('result');
+    }
+
+    function startQuiz() {
+      index = 0;
+      scores = {};
+      render();
+      show('quiz');
+      requestAnimationFrame(fitQuestionFont);   // 表示後の実寸で再計算
+    }
+
+    /* 16タイプ一覧を生成 */
+    function buildTypes() {
+      const grid = document.getElementById('types-grid');
+      grid.innerHTML = Object.entries(TYPES16).map(([id, t]) => `
+        <div class="type-card">
+          <img src="assets/types/type${id}.png" alt="${t.name}">
+          <h3>${t.strength}</h3>
+          <p>${t.desc}</p>
+        </div>`).join('');
+    }
+
+    /* 結果ページの固定パーツ（求人・社員・フォーム選択肢）を生成 */
+    function buildResultStatic() {
+      document.getElementById('jobs-grid').innerHTML = JOBS.map((j) => `
+        <div class="job-card">
+          <h4>${j.title}</h4>
+          <div class="job-tags">${j.tags.map((t) => `<span>${t}</span>`).join('')}</div>
+          <p>${j.desc}</p>
+          <a href="#apply">この求人に応募 ▶</a>
+        </div>`).join('');
+
+      document.getElementById('emp-list').innerHTML = EMPLOYEES.map((e, i) =>
+        `<img class="emp-photo" src="${e.img}" alt="${e.alt}" data-i="${i}">`
+      ).join('');
+
+      const opt = (v) => `<option value="${v}">${v}</option>`;
+      document.querySelector('#apply-form [name=position]').innerHTML =
+        `<option value="">選択してください</option>` + POSITIONS.map(opt).join('');
+      document.querySelector('#apply-form [name=timing]').innerHTML =
+        `<option value="">選択してください</option>` + TIMINGS.map(opt).join('');
+    }
+
+    buildTypes();
+    buildResultStatic();
+
+    /* 社員カード：クリックで手配書モーダルを開く */
+    const empModal = document.getElementById('emp-modal');
+    const empModalImg = document.getElementById('emp-modal-img');
+    const empModalInterview = document.getElementById('emp-modal-interview');
+    document.querySelectorAll('#emp-list .emp-photo').forEach((img) => {
+      img.addEventListener('click', () => {
+        const e = EMPLOYEES[Number(img.dataset.i)];
+        empModalImg.src = e.img;
+        empModalImg.alt = e.alt;
+        empModalInterview.href = e.interview || '#';
+        empModal.hidden = false;
+      });
+    });
+    const closeEmpModal = () => { empModal.hidden = true; };
+    document.getElementById('emp-modal-close').addEventListener('click', closeEmpModal);
+    empModal.addEventListener('click', (ev) => { if (ev.target === empModal) closeEmpModal(); });
+
+    cards.forEach((card) => {
+      card.addEventListener('click', () => answer(Number(card.dataset.index)));
+    });
+    document.getElementById('start-btn').addEventListener('click', startQuiz);
+    document.getElementById('types-btn').addEventListener('click', () => show('types'));
+    document.getElementById('types-back').addEventListener('click', () => show('title'));
+    document.getElementById('retry-btn').addEventListener('click', () => show('title'));
+
+    /* 結果ページ内：アクションボタンで各セクションへスクロール */
+    document.querySelectorAll('#result-screen [data-scroll]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const target = document.getElementById(btn.dataset.scroll);
+        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
+
+    /* 応募フォーム送信（デモ：フロントのみ。送信先は未接続） */
+    document.getElementById('apply-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const form = e.target;
+      if (!form.checkValidity()) { form.reportValidity(); return; }
+      form.querySelectorAll('.field, .form-submit').forEach((el) => { el.style.display = 'none'; });
+      document.getElementById('form-thanks').style.display = 'block';
+      document.getElementById('form-thanks').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  </script>
+  <div style="position:fixed;right:5px;bottom:3px;z-index:99;font:11px monospace;color:rgba(255,255,255,.6);pointer-events:none;">ver.9</div>
+</body>
+</html>
