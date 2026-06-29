@@ -166,11 +166,11 @@
   /* 質問テキスト（看板の上）。看板基準の座標・サイズなので、画面比が変わっても常に同じ位置 */
   .question {
     position: absolute;
-    left: 27%;                   /* 羊皮紙の中央寄せ（木枠にかからないよう内側に） */
+    left: 24%;                   /* 羊皮紙の上部・中央（カードの上） */
     top: 27%;
-    width: 46%;
-    height: 30%;
-    padding: 0 2%;               /* 羊皮紙の端から余白 */
+    width: 52%;
+    height: 17%;
+    padding: 0 1%;               /* 羊皮紙の端から余白 */
     box-sizing: border-box;
     display: flex;
     align-items: center;
@@ -187,15 +187,16 @@
     z-index: 5;
   }
 
-  /* 選択肢カード 2x2 */
+  /* 選択肢カード 2x2（看板の羊皮紙の上。座標は看板基準） */
   .card {
     position: absolute;
-    width: 8.55%;
+    width: 25.4%;                  /* 看板幅基準 */
     aspect-ratio: 1 / 1;
     background: none;
     border: none;
     padding: 0;
     cursor: pointer;
+    pointer-events: auto;          /* banner-wrap が none なので個別に有効化 */
     transition: transform .15s ease, filter .15s ease;
   }
   .card img {
@@ -222,10 +223,10 @@
   .card:hover { transform: translateY(-4px) scale(1.03); filter: brightness(1.05); }
   .card:active { transform: translateY(-1px) scale(1.0); }
 
-  .card.c1 { left: 41.45%; top: 48.88%; }
-  .card.c2 { left: 50.30%; top: 48.88%; }
-  .card.c3 { left: 41.45%; top: 64.08%; }
-  .card.c4 { left: 50.30%; top: 64.08%; }
+  .card.c1 { left: 24.6%; top: 47.5%; }
+  .card.c2 { left: 50.9%; top: 47.5%; }
+  .card.c3 { left: 24.6%; top: 61.9%; }
+  .card.c4 { left: 50.9%; top: 61.9%; }
 
   /* 進捗（第n問 / 全m問） */
   .progress {
@@ -622,14 +623,14 @@
     .menu-btn.start { top: 59.5%; }
     .menu-btn.types { top: 65.5%; }
 
-    /* 質問画面：縦フローで「進捗 → 看板 → カード2×2」を自動で中央配置（数値の当て勘なし）
+    /* 質問画面：看板を画面いっぱいに。質問とカードは看板の羊皮紙の上に乗る（landscapeと同じ構造）
        :not([hidden]) で「表示中のときだけ」flex に（id優先度で hidden を上書きしないように） */
     #quiz-screen:not([hidden]) {
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: safe center;   /* 収まらない時は上詰めにフォールバック */
-      gap: 0.6svh;
+      justify-content: safe center;
+      gap: 1svh;
       padding: 1svh 2vw;
       height: 100svh;                 /* 常に見える高さに収める（URLバーが出ても見切れない） */
       bottom: auto;
@@ -644,25 +645,12 @@
       position: relative;
       left: auto;
       top: auto;
-      /* 画面を大きく埋める。幅基準と「常に見える高さ(svh)」基準の小さい方で収める */
-      width: min(66vw, 28svh);
+      /* 看板を画面いっぱいに（幅 or 高さの小さい方で収める）。質問・カードは看板の上に乗る */
+      width: min(94vw, 53svh);
       aspect-ratio: 562 / 999;        /* 比率を保って高さを算出（潰れ防止） */
       height: auto;
       flex: 0 0 auto;
     }
-    #quiz-screen .cards {
-      display: grid;
-      grid-template-columns: repeat(2, min(47vw, 22svh));
-      gap: 2.5vw;
-      justify-content: center;
-    }
-    #quiz-screen .card {
-      position: relative;   /* 中の画像・ラベル(absolute)の基準になるよう relative を維持 */
-      left: auto;
-      top: auto;
-      width: min(47vw, 22svh);
-    }
-    #quiz-screen .card .label { font-size: clamp(12px, 3.6vw, 16px); }
   }
 </style>
 </head>
@@ -683,13 +671,10 @@
     <section class="screen" id="quiz-screen" hidden>
       <p class="progress" id="progress"></p>
 
-      <!-- 看板＋質問文（質問は看板の子要素なので常に同じ位置に乗る） -->
+      <!-- 看板（羊皮紙）の上に、質問文と選択肢カード2×2をすべて配置 -->
       <div class="banner-wrap">
         <img class="banner-img" src="assets/banner.png" alt="">
         <p class="question" id="question"></p>
-      </div>
-
-      <div class="cards">
         <button class="card c1" type="button" data-index="0">
           <img src="assets/card1.png" alt="">
           <span class="label"></span>
@@ -1060,21 +1045,25 @@
     let index = 0;
     let scores = {};
 
-    // 看板の実寸から質問文サイズを計算（cqw非対応ブラウザでもはみ出さない）
-    function fitQuestionFont() {
+    // 看板の実寸から質問文・カードラベルのサイズを計算（cqw非対応ブラウザでもはみ出さない）
+    function fitFonts() {
       const wrap = document.querySelector('.banner-wrap');
-      if (!wrap || !questionEl) return;
+      if (!wrap) return;
       const w = wrap.clientWidth;
-      if (w > 0) questionEl.style.fontSize = (w * 0.047) + 'px';
+      if (w <= 0) return;
+      if (questionEl) questionEl.style.fontSize = (w * 0.047) + 'px';
+      document.querySelectorAll('#quiz-screen .card .label').forEach((el) => {
+        el.style.fontSize = (w * 0.035) + 'px';
+      });
     }
-    window.addEventListener('resize', fitQuestionFont);
-    window.addEventListener('orientationchange', () => setTimeout(fitQuestionFont, 100));
+    window.addEventListener('resize', fitFonts);
+    window.addEventListener('orientationchange', () => setTimeout(fitFonts, 100));
 
     function render() {
       const item = QUESTIONS[index];
       progressEl.textContent = `第${index + 1}問 / 全${QUESTIONS.length}問`;
       questionEl.textContent = item.q;
-      fitQuestionFont();
+      fitFonts();
       cards.forEach((card, i) => {
         const label = card.querySelector('.label');
         const has = i < item.options.length;
@@ -1131,7 +1120,7 @@
       scores = {};
       render();
       show('quiz');
-      requestAnimationFrame(fitQuestionFont);   // 表示後の実寸で再計算
+      requestAnimationFrame(fitFonts);   // 表示後の実寸で再計算
     }
 
     /* 16タイプ一覧を生成 */
@@ -1212,6 +1201,6 @@
       document.getElementById('form-thanks').scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
   </script>
-  <div style="position:fixed;right:5px;bottom:3px;z-index:99;font:11px monospace;color:rgba(255,255,255,.6);pointer-events:none;">ver.10</div>
+  <div style="position:fixed;right:5px;bottom:3px;z-index:99;font:11px monospace;color:rgba(255,255,255,.6);pointer-events:none;">ver.11</div>
 </body>
 </html>
