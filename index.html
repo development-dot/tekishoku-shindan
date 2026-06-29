@@ -616,12 +616,12 @@
       height: 100dvh;
     }
 
-    /* タイトル画面 */
-    .title-logo { top: 14%; width: 90%; }
-    .title-board { left: 6%; top: 38%; width: 88%; }
+    /* タイトル画面（全体を少し下げて中央寄せ・ボタンは羊皮紙の中心に） */
+    .title-logo { top: 18%; width: 88%; }
+    .title-board { left: 6%; top: 42%; width: 88%; }
     .menu-btn { width: 64%; font-size: clamp(15px, 5vw, 24px); }
-    .menu-btn.start { top: 59.5%; }
-    .menu-btn.types { top: 65.5%; }
+    .menu-btn.start { top: 56.5%; }
+    .menu-btn.types { top: 62.5%; }
 
     /* 質問画面：看板を画面いっぱいに。質問とカードは看板の羊皮紙の上に乗る（landscapeと同じ構造）
        :not([hidden]) で「表示中のときだけ」flex に（id優先度で hidden を上書きしないように） */
@@ -1201,6 +1201,6 @@
       document.getElementById('form-thanks').scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
   </script>
-  <div style="position:fixed;right:5px;bottom:3px;z-index:99;font:11px monospace;color:rgba(255,255,255,.6);pointer-events:none;">ver.11</div>
+  <div style="position:fixed;right:5px;bottom:3px;z-index:99;font:11px monospace;color:rgba(255,255,255,.6);pointer-events:none;">ver.12</div>
 </body>
 </html>
