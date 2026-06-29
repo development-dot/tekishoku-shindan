@@ -73,29 +73,38 @@
     user-select: none;
     filter: drop-shadow(0 0.6cqw 1.2cqw rgba(0,0,0,.45));
   }
-  /* タイトルの選択ボード（木枠＋羊皮紙） */
-  .title-board {
+  /* タイトルの選択ボード（木枠＋羊皮紙）。ボタンを内包し、ボード基準で配置 */
+  .board-wrap {
     position: absolute;
     left: 29.31%;
     top: 44.84%;
     width: 41.39%;
-    height: auto;
+    aspect-ratio: 1448 / 1086;     /* ボード画像の比率（ボタン座標の基準） */
     pointer-events: none;
-    user-select: none;
     filter: drop-shadow(0 0.6cqw 1.4cqw rgba(0,0,0,.45));
   }
-  /* タイトルの選択ボタン（BestTen フォント） */
+  .title-board {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    pointer-events: none;
+    user-select: none;
+  }
+  /* タイトルの選択ボタン（BestTen フォント）。top はボード基準％ → 常に羊皮紙の上 */
   .menu-btn {
     position: absolute;
     left: 50%;
-    width: 22.25%;
+    width: 74%;
     transform: translate(-50%, -50%);
     border: none;
     background: none;
-    padding: .3cqw 0;
+    padding: 0;
     cursor: pointer;
+    pointer-events: auto;          /* board-wrap が none なので個別に有効化 */
     font-family: "BestTen DOT", "Reggae One", sans-serif;
-    font-size: 2.3cqw;
+    font-size: 16px;               /* JSで board 幅から再計算 */
     letter-spacing: .08em;
     color: #4a2f12;
     text-align: center;
@@ -104,8 +113,8 @@
   }
   .menu-btn:hover { transform: translate(-50%, -50%) scale(1.06); color: #8a4a12; filter: drop-shadow(0 2px 3px rgba(0,0,0,.3)); }
   .menu-btn:active { transform: translate(-50%, -50%) scale(1.0); }
-  .menu-btn.start  { top: 73.27%; }
-  .menu-btn.types  { top: 80.60%; }
+  .menu-btn.start  { top: 51.5%; }   /* ボード基準（羊皮紙の上） */
+  .menu-btn.types  { top: 64.8%; }
 
   /* 結果画面の「もう一度」ボタン（看板テクスチャ流用） */
   .start-btn {
@@ -618,10 +627,8 @@
 
     /* タイトル画面（全体を少し下げて中央寄せ・ボタンは羊皮紙の中心に） */
     .title-logo { top: 17%; width: 88%; }
-    .title-board { left: 6%; top: 41%; width: 88%; }
-    .menu-btn { width: 64%; font-size: clamp(15px, 5vw, 24px); }
-    .menu-btn.start { top: 56.5%; }   /* 横画面と同じ看板基準の比率に合わせる */
-    .menu-btn.types { top: 60.5%; }
+    .board-wrap { left: 6%; top: 41%; width: 88%; }
+    /* ボタン位置はボード基準（base の 51.5%/64.8%）なので縦でも変更不要 */
 
     /* 質問画面：看板を画面いっぱいに。質問とカードは看板の羊皮紙の上に乗る（landscapeと同じ構造）
        :not([hidden]) で「表示中のときだけ」flex に（id優先度で hidden を上書きしないように） */
@@ -662,9 +669,12 @@
     <section class="screen" id="title-screen">
       <img class="title-bg" src="assets/title-bg.png" alt="">
       <img class="title-logo" src="assets/title-logo.png" alt="RPG適職診断">
-      <img class="title-board" src="assets/title-board.png" alt="">
-      <button class="menu-btn start" type="button" id="start-btn">診断を始める</button>
-      <button class="menu-btn types" type="button" id="types-btn">16タイプを見る</button>
+      <!-- ボード＋ボタン（ボタンはボードの子＝ボード基準で羊皮紙の上に乗る） -->
+      <div class="board-wrap">
+        <img class="title-board" src="assets/title-board.png" alt="">
+        <button class="menu-btn start" type="button" id="start-btn">診断を始める</button>
+        <button class="menu-btn types" type="button" id="types-btn">16タイプを見る</button>
+      </div>
     </section>
 
     <!-- 質問画面 -->
@@ -1048,15 +1058,25 @@
     // 看板の実寸から質問文・カードラベルのサイズを計算（cqw非対応ブラウザでもはみ出さない）
     function fitFonts() {
       const wrap = document.querySelector('.banner-wrap');
-      if (!wrap) return;
-      const w = wrap.clientWidth;
-      if (w <= 0) return;
-      if (questionEl) questionEl.style.fontSize = (w * 0.047) + 'px';
-      document.querySelectorAll('#quiz-screen .card .label').forEach((el) => {
-        el.style.fontSize = (w * 0.035) + 'px';
-      });
+      if (wrap) {
+        const w = wrap.clientWidth;
+        if (w > 0) {
+          if (questionEl) questionEl.style.fontSize = (w * 0.047) + 'px';
+          document.querySelectorAll('#quiz-screen .card .label').forEach((el) => {
+            el.style.fontSize = (w * 0.035) + 'px';
+          });
+        }
+      }
+      const board = document.querySelector('.board-wrap');
+      if (board) {
+        const bw = board.clientWidth;
+        if (bw > 0) document.querySelectorAll('.menu-btn').forEach((el) => {
+          el.style.fontSize = (bw * 0.055) + 'px';
+        });
+      }
     }
     window.addEventListener('resize', fitFonts);
+    window.addEventListener('load', fitFonts);
     window.addEventListener('orientationchange', () => setTimeout(fitFonts, 100));
 
     function render() {
@@ -1157,6 +1177,7 @@
 
     buildTypes();
     buildResultStatic();
+    fitFonts();   // タイトルのボタン等を初期表示時に算出
 
     /* 社員カード：クリックで手配書モーダルを開く */
     const empModal = document.getElementById('emp-modal');
@@ -1201,6 +1222,6 @@
       document.getElementById('form-thanks').scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
   </script>
-  <div style="position:fixed;right:5px;bottom:3px;z-index:99;font:11px monospace;color:rgba(255,255,255,.6);pointer-events:none;">ver.15</div>
+  <div style="position:fixed;right:5px;bottom:3px;z-index:99;font:11px monospace;color:rgba(255,255,255,.6);pointer-events:none;">ver.16</div>
 </body>
 </html>
