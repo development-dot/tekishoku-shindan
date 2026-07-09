@@ -92,6 +92,37 @@
     pointer-events: none;
     user-select: none;
   }
+  /* タイトル背景を舞う葉っぱ */
+  .title-leaves {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .title-leaves .leaf {
+    position: absolute;
+    top: -14cqh;
+    left: var(--x);
+    width: var(--size);
+    height: auto;
+    opacity: 0;
+    filter: drop-shadow(0 0.3cqw 0.4cqw rgba(0,0,0,.25));
+    animation-name: leaf-fall;
+    animation-duration: var(--duration);
+    animation-delay: var(--delay);
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+    will-change: transform, opacity;
+  }
+  @keyframes leaf-fall {
+    0%   { transform: translate(0, 0) rotate(0deg); opacity: 0; }
+    8%   { opacity: .85; }
+    30%  { transform: translate(calc(var(--drift) * 0.28), 30cqh) rotate(90deg); }
+    55%  { transform: translate(calc(var(--drift) * 0.58), 58cqh) rotate(170deg); }
+    80%  { transform: translate(calc(var(--drift) * 0.85), 88cqh) rotate(250deg); }
+    92%  { opacity: .85; }
+    100% { transform: translate(var(--drift), 118cqh) rotate(320deg); opacity: 0; }
+  }
   /* タイトルの選択ボタン（BestTen フォント）。top はボード基準％ → 常に羊皮紙の上 */
   .menu-btn {
     position: absolute;
@@ -113,8 +144,8 @@
   }
   .menu-btn:hover { transform: translate(-50%, -50%) scale(1.06); color: #8a4a12; filter: drop-shadow(0 2px 3px rgba(0,0,0,.3)); }
   .menu-btn:active { transform: translate(-50%, -50%) scale(1.0); }
-  .menu-btn.start  { top: 51.5%; }   /* ボード基準（羊皮紙の上） */
-  .menu-btn.types  { top: 64.8%; }
+  .menu-btn.start  { top: 48.5%; }   /* ボード基準（羊皮紙の上） */
+  .menu-btn.types  { top: 61.8%; }
 
   /* 結果画面の「もう一度」ボタン（看板テクスチャ流用） */
   .start-btn {
@@ -249,6 +280,117 @@
     font-size: 1.3cqw;
     letter-spacing: .1em;
     text-shadow: 0 1px 4px rgba(0,0,0,.8);
+  }
+
+  /* 看板の足元：勇者は常駐、敵は3問かけてダメージを蓄積し3問目で撃破（フェードアウトは撃破時のみ） */
+  .battle-fx {
+    position: absolute;
+    left: 50%;
+    bottom: 1.5%;
+    transform: translateX(-50%);
+    width: 46%;
+    height: 15cqh;
+    pointer-events: none;
+    z-index: 6;
+  }
+
+  .battle-hero {
+    position: absolute;
+    left: 6%;
+    bottom: 0;
+    width: 24%;
+    opacity: 0;
+    transform-origin: 60% 100%;
+    transition: opacity .3s ease;
+  }
+  .battle-hero.shown { opacity: 1; }     /* 診断開始時に一度だけフェードイン、以降は出しっぱなし */
+  .battle-hero.attack { animation: battle-hero-attack .55s ease-in-out; }
+  .battle-hero-img {
+    display: block;
+    width: 100%;
+    height: auto;
+    transform: scaleX(-1);           /* 元画像は左向きなので反転して右（敵側）を向かせる */
+    filter: drop-shadow(0 .4cqw .5cqw rgba(0,0,0,.4));
+  }
+
+  .battle-monster {
+    position: absolute;
+    right: 6%;
+    bottom: 0;
+    width: var(--mw, 24%);
+    height: auto;
+    opacity: 0;
+    transform-origin: 40% 100%;
+    filter: drop-shadow(0 .4cqw .5cqw rgba(0,0,0,.4));
+  }
+  /* 登場後はこのクラスで不透明度1を維持し続ける（怯みアニメが終わっても消えない） */
+  .battle-monster.shown     { opacity: 1; }
+  /* 1発目：新しい敵が登場すると同時にヒット */
+  .battle-monster.enter-hit { animation: battle-monster-enter-hit .75s ease-in-out forwards; }
+  /* 2発目：怯むが倒れない（フェードしない＝出しっぱなし） */
+  .battle-monster.hurt      { animation: battle-monster-hurt .55s ease-in-out; }
+  /* 3発目：撃破。ここでだけフェードアウトする（アニメの forwards が .shown の opacity:1 を上書き） */
+  .battle-monster.defeat    { animation: battle-monster-defeat .9s ease-in forwards; }
+
+  /* 撃破！の一文字演出（3問目のみ） */
+  .battle-ko-label {
+    position: absolute;
+    left: 50%;
+    top: -13%;
+    transform: translateX(-50%) scale(.6);
+    font-family: "Reggae One", sans-serif;
+    font-size: 3cqw;
+    color: #ffdd55;
+    text-shadow: 0 .18cqw 0 #a9701c, 0 .3cqw .4cqw rgba(0,0,0,.6);
+    opacity: 0;
+    white-space: nowrap;
+  }
+  .battle-ko-label.show { animation: battle-ko-label .9s ease-out; }
+
+  /* 勇者の攻撃モーション（振りかぶり→斬撃→引き、テンポよく） */
+  @keyframes battle-hero-attack {
+    0%   { transform: translate(0, 0) scale(1) rotate(0deg); }
+    25%  { transform: translate(1%, -4%) scale(1.03) rotate(-12deg); }   /* 振りかぶり */
+    50%  { transform: translate(25%, 0) scale(1.1) rotate(22deg); }      /* 斬撃 */
+    72%  { transform: translate(8%, 0) scale(1.02) rotate(0deg); }       /* 引き */
+    100% { transform: translate(0, 0) scale(1) rotate(0deg); }
+  }
+
+  /* 新しい敵が登場すると同時に1発目のヒットを受ける */
+  @keyframes battle-monster-enter-hit {
+    0%   { opacity: 0; transform: translate(40%, 0) scale(.8) rotate(0deg); }
+    32%  { opacity: 1; transform: translate(0, 0) scale(1) rotate(0deg); }   /* 登場 */
+    55%  { transform: translate(0, 0) scale(1) rotate(0deg); }
+    70%  { transform: translate(-9%, 1%) scale(.93) rotate(-10deg); }        /* 被弾 */
+    88%  { transform: translate(-3%, 1%) scale(.97) rotate(6deg); }
+    100% { opacity: 1; transform: translate(0, 0) scale(1) rotate(0deg); }
+  }
+
+  /* 2発目：怯むだけで姿勢を立て直す（消えない） */
+  @keyframes battle-monster-hurt {
+    0%   { transform: translate(0, 0) scale(1) rotate(0deg); }
+    40%  { transform: translate(0, 0) scale(1) rotate(0deg); }
+    55%  { transform: translate(-9%, 1%) scale(.92) rotate(-10deg); }  /* 被弾 */
+    75%  { transform: translate(-3%, 1%) scale(.97) rotate(6deg); }
+    100% { transform: translate(0, 0) scale(1) rotate(0deg); }
+  }
+
+  /* 3発目：倒れて縮みながらフェードアウト（撃破はここだけ） */
+  @keyframes battle-monster-defeat {
+    0%   { opacity: 1; transform: translate(0, 0) scale(1) rotate(0deg); }
+    30%  { transform: translate(0, 0) scale(1) rotate(0deg); }
+    45%  { transform: translate(-9%, 1%) scale(.93) rotate(-10deg); }        /* 被弾 */
+    60%  { opacity: 1; transform: translate(-2%, 4%) scale(.85) rotate(10deg); }
+    85%  { transform: translate(3%, 20%) scale(.4) rotate(35deg); opacity: .35; }  /* 撃破・縮んで落下 */
+    100% { opacity: 0; transform: translate(3%, 26%) scale(.2) rotate(45deg); }
+  }
+
+  @keyframes battle-ko-label {
+    0%, 35%  { opacity: 0; transform: translateX(-50%) scale(.6); }
+    50%      { opacity: 1; transform: translateX(-50%) scale(1.15); }
+    62%      { opacity: 1; transform: translateX(-50%) scale(1); }
+    85%      { opacity: 1; transform: translateX(-50%) scale(1); }
+    100%     { opacity: 0; transform: translateX(-50%) scale(1); }
   }
 
   /* ===== 結果画面（縦長・スクロールする羊皮紙ページ） ===== */
@@ -670,6 +812,7 @@
     <!-- タイトル画面 -->
     <section class="screen" id="title-screen">
       <img class="title-bg" src="assets/title-bg.png" alt="">
+      <div class="title-leaves" id="title-leaves" aria-hidden="true"></div>
       <img class="title-logo" src="assets/title-logo.png" alt="RPG適職診断">
       <!-- ボード＋ボタン（ボタンはボードの子＝ボード基準で羊皮紙の上に乗る） -->
       <div class="board-wrap">
@@ -703,6 +846,15 @@
           <img src="assets/card4.png" alt="">
           <span class="label"></span>
         </button>
+      </div>
+
+      <!-- 看板下：勇者が敵を倒す一枚絵アニメーション（2問に1回くらい表示） -->
+      <div class="battle-fx" id="battle-fx" aria-hidden="true">
+        <div class="battle-hero" id="battle-hero">
+          <img class="battle-hero-img" src="assets/hero-attack.png" alt="">
+        </div>
+        <img class="battle-monster" id="battle-monster" src="" alt="">
+        <p class="battle-ko-label" id="battle-ko-label">撃破！</p>
       </div>
     </section>
   </main>
@@ -1050,6 +1202,28 @@
       Object.entries(screens).forEach(([k, el]) => { el.hidden = (k !== name); });
     };
 
+    /* タイトル背景に舞う葉っぱを生成 */
+    (() => {
+      const leavesEl = document.getElementById('title-leaves');
+      const LEAF_COUNT = 9;
+      for (let i = 0; i < LEAF_COUNT; i++) {
+        const leaf = document.createElement('img');
+        leaf.className = 'leaf';
+        leaf.src = 'assets/leaf.png';
+        leaf.alt = '';
+        const duration = (10 + Math.random() * 8).toFixed(1);   // 10〜18秒
+        const delay = (-Math.random() * duration).toFixed(1);   // 開始位置をばらけさせる
+        const size = (1.6 + Math.random() * 1.6).toFixed(2);    // 1.6〜3.2cqw（やや小さめ）
+        const drift = (22 + Math.random() * 34).toFixed(1);     // 左→右へ一定に流れ、広がる量
+        leaf.style.setProperty('--x', `${(-15 + Math.random() * 85).toFixed(1)}%`); // 左寄りから開始
+        leaf.style.setProperty('--size', `${size}cqw`);
+        leaf.style.setProperty('--duration', `${duration}s`);
+        leaf.style.setProperty('--delay', `${delay}s`);
+        leaf.style.setProperty('--drift', `${drift}cqw`);
+        leavesEl.appendChild(leaf);
+      }
+    })();
+
     const progressEl = document.getElementById('progress');
     const questionEl  = document.getElementById('question');
     const cards = Array.from(document.querySelectorAll('#quiz-screen .card'));
@@ -1081,9 +1255,82 @@
     window.addEventListener('load', fitFonts);
     window.addEventListener('orientationchange', () => setTimeout(fitFonts, 100));
 
+    /* ★ 勇者 vs モンスターの撃破アニメーション（看板の足元）
+       勇者は診断開始時に登場したらずっと出しっぱなし。敵は3問かけてダメージを蓄積し、
+       3問目で撃破（フェードアウトするのは撃破の瞬間だけ）。テンポよく進むよう短めの尺で。 */
+    const MONSTERS = {
+      slime:  { src: 'assets/monster-slime.png',  width: '18%' },
+      mage:   { src: 'assets/monster-mage.png',   width: '20%' },
+      dragon: { src: 'assets/monster-dragon.png', width: '27%' },
+    };
+    // 1〜3問目スライム／4〜6問目魔術師／7〜10問目ドラゴン
+    const monsterForQuestion = (qNum) => {
+      if (qNum <= 3) return 'slime';
+      if (qNum <= 6) return 'mage';
+      if (qNum <= 10) return 'dragon';
+      return null;
+    };
+    // 撃破に必要なヒット数（ドラゴンは7〜10問目の4問かけて倒す。他は3問）
+    const HITS_TO_DEFEAT = { slime: 3, mage: 3, dragon: 4 };
+
+    const battleHeroEl = document.getElementById('battle-hero');
+    const battleMonEl  = document.getElementById('battle-monster');
+    const battleKoEl    = document.getElementById('battle-ko-label');
+    let currentArc  = null;   // 現在戦っている敵の種類
+    let hitsInArc   = 0;      // その敵に何発当てたか（1〜3）
+
+    const BATTLE_MS = { enter: 750, hurt: 550, defeat: 900 };   // スピード感重視で短めに
+
+    function retrigger(el, className) {
+      el.classList.remove(className);
+      void el.offsetWidth;   // reflow でアニメーションを再始動
+      el.classList.add(className);
+    }
+
+    // 診断開始時に一度だけ勇者を登場させ、以降は常に表示したままにする
+    function showHero() {
+      if (battleHeroEl) battleHeroEl.classList.add('shown');
+    }
+
+    function playBattle(qNum) {
+      const kind = monsterForQuestion(qNum);
+      if (!battleMonEl || !kind) return 0;
+
+      if (battleHeroEl) retrigger(battleHeroEl, 'attack');
+
+      if (kind !== currentArc) { currentArc = kind; hitsInArc = 0; }
+      hitsInArc++;
+      const isFirstHit = hitsInArc === 1;
+      const isFinalHit = hitsInArc >= (HITS_TO_DEFEAT[kind] || 3);
+
+      battleMonEl.classList.remove('enter-hit', 'hurt', 'defeat');
+
+      if (isFirstHit) {
+        // 新しい敵が登場すると同時に1発目のヒット
+        const info = MONSTERS[kind];
+        battleMonEl.src = info.src;
+        battleMonEl.style.setProperty('--mw', info.width);
+        void battleMonEl.offsetWidth;
+        battleMonEl.classList.add('enter-hit', 'shown');   // shown＝以後は消えない基準の不透明度
+        return BATTLE_MS.enter;
+      }
+
+      if (isFinalHit) {
+        void battleMonEl.offsetWidth;
+        battleMonEl.classList.add('defeat');   // ここでだけフェードアウトする
+        if (battleKoEl) retrigger(battleKoEl, 'show');
+        return BATTLE_MS.defeat;
+      }
+
+      void battleMonEl.offsetWidth;
+      battleMonEl.classList.add('hurt');       // 怯むだけで消えない
+      return BATTLE_MS.hurt;
+    }
+
     function render() {
       const item = QUESTIONS[index];
-      progressEl.textContent = `第${index + 1}問 / 全${QUESTIONS.length}問`;
+      const qNum = index + 1;
+      progressEl.textContent = `第${qNum}問 / 全${QUESTIONS.length}問`;
       questionEl.textContent = item.q;
       fitFonts();
       cards.forEach((card, i) => {
@@ -1094,16 +1341,35 @@
       });
     }
 
+    let answering = false;
+
     function answer(i) {
+      if (answering) return;   // 攻撃演出が終わるまで多重クリックを防止
+
       const ts = QUESTIONS[index].types?.[i] || [];
       (Array.isArray(ts) ? ts : [ts]).forEach((t) => {
         scores[t] = (scores[t] || 0) + 1;
       });
-      index++;
-      if (index < QUESTIONS.length) {
-        render();
+
+      const duration = playBattle(index + 1);   // 選択した直後に、今答えた問題の番号で攻撃
+
+      const proceed = () => {
+        answering = false;
+        cards.forEach((c) => { c.style.pointerEvents = ''; });
+        index++;
+        if (index < QUESTIONS.length) {
+          render();
+        } else {
+          showResult();
+        }
+      };
+
+      if (duration > 0) {
+        answering = true;
+        cards.forEach((c) => { c.style.pointerEvents = 'none'; });
+        setTimeout(proceed, duration);
       } else {
-        showResult();
+        proceed();
       }
     }
 
@@ -1142,6 +1408,7 @@
       scores = {};
       render();
       show('quiz');
+      showHero();
       requestAnimationFrame(fitFonts);   // 表示後の実寸で再計算
     }
 
